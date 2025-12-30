@@ -5,22 +5,30 @@ on:
     branches:
       - main
       - staging
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       environment:
         description: 'Environment to deploy'
         required: true
-        default: 'staging'
         type: choice
         options:
           - staging
           - prod
 
+env:
+  AWS_REGION: us-east-1
+  TERRAFORM_VERSION: 1.6.0
+
 jobs:
-  terraform-plan-staging:
-    name: Terraform Plan (staging)
+  terraform-plan:
+    name: Terraform Plan
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        environment: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.environment)) || (github.ref == 'refs/heads/main' && fromJSON('["staging", "prod"]')) || fromJSON('["staging"]') }}
     
     steps:
       - name: Checkout code
@@ -29,43 +37,57 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.6.0
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init
         working-directory: ./terraform
         run: terraform init
 
-      - name: Terraform Format 
+      - name: Terraform Format Check
         working-directory: ./terraform
-        run: terraform fmt -recursive
+        run: terraform fmt -check
 
       - name: Terraform Validate
         working-directory: ./terraform
         run: terraform validate
-
+      - name: Package Lambda function
+        run: |
+            cd modules/lambda
+            zip -r lambda.zip app.py requirements.txt
+            cd ../..
       - name: Terraform Plan
         working-directory: ./terraform
-        run: terraform plan -var-file="environments/staging.tfvars" -out=tfplan
+        run: |
+          terraform plan \
+            -var-file="environments/${{ matrix.environment }}.tfvars" \
+            -out=${{ matrix.environment }}.tfplan
+            
 
       - name: Upload Plan
         uses: actions/upload-artifact@v4
         with:
-          name: staging-tfplan
-          path: terraform/tfplan
+          name: ${{ matrix.environment }}-tfplan
+          path: terraform/${{ matrix.environment }}.tfplan
+          retention-days: 5
 
-  deploy-staging:
+  terraform-apply-staging:
     name: Deploy to Staging
-    needs: terraform-plan-staging
+    needs: terraform-plan
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main'
-    environment: staging
+    if: |
+      (github.ref == 'refs/heads/staging' && github.event_name == 'push') ||
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.api_endpoint }}
     
     steps:
       - name: Checkout code
@@ -74,24 +96,15 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.6.0
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Package Lambda Function
-        run: |
-          cd lambda
-          zip -r ../terraform/lambda_function.zip .
-          cd ..
-
-      - name: Terraform Init
-        working-directory: ./terraform
-        run: terraform init
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Download Plan
         uses: actions/download-artifact@v4
@@ -99,62 +112,32 @@ jobs:
           name: staging-tfplan
           path: terraform/
 
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
       - name: Terraform Apply
-        working-directory: ./terraform
-        run: terraform apply -auto-approve tfplan
-
-      - name: Get API Endpoint
+        id: deploy
         working-directory: ./terraform
         run: |
-          echo "API_ENDPOINT=$(terraform output -raw api_endpoint)" >> $GITHUB_OUTPUT
-        id: output
+          terraform apply -auto-approve staging.tfplan
+          echo "api_endpoint=$(terraform output -raw api_endpoint)" >> $GITHUB_OUTPUT
 
-      - name: Display API Endpoint
+      - name: Test Health Endpoint
         run: |
-          echo "🚀 Staging API Endpoint: ${{ steps.output.outputs.API_ENDPOINT }}"
+          sleep 10
+          curl -f ${{ steps.deploy.outputs.api_endpoint }} || exit 1
 
-  terraform-plan-prod:
-    name: Terraform Plan (prod)
-    needs: deploy-staging
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.0
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Terraform Init
-        working-directory: ./terraform
-        run: terraform init
-
-      - name: Terraform Plan
-        working-directory: ./terraform
-        run: terraform plan -var-file="environments/prod.tfvars" -out=tfplan-prod
-
-      - name: Upload Plan
-        uses: actions/upload-artifact@v4
-        with:
-          name: prod-tfplan
-          path: terraform/tfplan-prod
-
-  deploy-prod:
+  terraform-apply-prod:
     name: Deploy to Production
-    needs: terraform-plan-prod
+    needs: [terraform-plan, terraform-apply-staging]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment: production
+    if: |
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.api_endpoint }}
     
     steps:
       - name: Checkout code
@@ -163,7 +146,8 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.6.0
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -171,16 +155,8 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-
-      - name: Package Lambda Function
-        run: |
-          cd lambda
-          zip -r ../terraform/lambda_function.zip .
-          cd ..
-
-      - name: Terraform Init
-        working-directory: ./terraform
-        run: terraform init
+          audience: sts.amazonaws.com
+          output-env-credentials: true
 
       - name: Download Plan
         uses: actions/download-artifact@v4
@@ -188,16 +164,18 @@ jobs:
           name: prod-tfplan
           path: terraform/
 
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
       - name: Terraform Apply
-        working-directory: ./terraform
-        run: terraform apply -auto-approve tfplan-prod
-
-      - name: Get API Endpoint
+        id: deploy
         working-directory: ./terraform
         run: |
-          echo "API_ENDPOINT=$(terraform output -raw api_endpoint)" >> $GITHUB_OUTPUT
-        id: output
+          terraform apply -auto-approve prod.tfplan
+          echo "api_endpoint=$(terraform output -raw api_endpoint)" >> $GITHUB_OUTPUT
 
-      - name: Display API Endpoint
+      - name: Test Health Endpoint
         run: |
-          echo "🚀 Production API Endpoint: ${{ steps.output.outputs.API_ENDPOINT }}"
+          sleep 10
+          curl -f ${{ steps.deploy.outputs.api_endpoint }} || exit 1
