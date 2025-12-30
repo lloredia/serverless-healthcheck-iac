@@ -3,27 +3,37 @@ variable "function_name" {
   type        = string
 }
 
-variable "environment" {
-  description = "Environment name"
+variable "role_arn" {
+  description = "ARN of the IAM role for Lambda function"
   type        = string
 }
 
-variable "source_dir" {
-  description = "Source directory for Lambda code"
+variable "runtime" {
+  description = "Lambda runtime"
   type        = string
+  default     = "python3.11"
 }
 
-variable "dynamodb_table_name" {
-  description = "Name of the DynamoDB table"
-  type        = string
+variable "timeout" {
+  description = "Lambda function timeout in seconds"
+  type        = number
+  default     = 30
 }
 
-variable "dynamodb_table_arn" {
-  description = "ARN of the DynamoDB table"
-  type        = string
+variable "memory_size" {
+  description = "Lambda function memory size in MB"
+  type        = number
+  default     = 128
 }
 
-variable "api_gateway_execution_arn" {
-  description = "Execution ARN of the API Gateway"
-  type        = string
+variable "environment_variables" {
+  description = "Environment variables for Lambda function"
+  type        = map(string)
+  default     = {}
+}
+
+variable "tags" {
+  description = "Tags to apply to Lambda function"
+  type        = map(string)
+  default     = {}
 }
