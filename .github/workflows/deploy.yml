@@ -53,38 +53,7 @@ jobs:
       - name: Terraform Format Check
         working-directory: ./terraform
         run: terraform fmt -check
-      - name: Setup Python
-  uses: actions/setup-python@v4
-  with:
-    python-version: '3.11'
      
-      - name: Package Lambda function
-        run: |
-    # Create the zip file in the root directory (where Terraform expects it)
-    cd modules/lambda
-    
-    # If you have dependencies
-    if [ -f requirements.txt ]; then
-      pip install -r requirements.txt -t package/
-      cp app.py package/
-      cd package
-      zip -r ../../lambda_function.zip .
-    else
-      # If no dependencies, just zip the app.py
-      zip ../lambda_function.zip app.py
-    fi
-    
-    cd ../..
-    ls -lh lambda_function.zip
-    
-      - name: Terraform Validate
-        working-directory: ./terraform
-        run: terraform validate
-      - name: Package Lambda function
-        run: |
-            cd modules/lambda
-            zip -r lambda.zip app.py requirements.txt
-            cd ../..
       - name: Terraform Plan
         working-directory: ./terraform
         run: |
