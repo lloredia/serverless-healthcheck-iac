@@ -3,8 +3,6 @@
 <!-- HEADER STYLE: CLASSIC -->
 <div align="center">
 
-<img src="serverless-health-check.png" width="30%" style="position: relative; top: 0; right: 0;" alt="Project Logo"/>
-
 # SERVERLESS-HEALTH-CHECK
 
 <em>Ensure System Uptime, Instantly and Reliably</em>
