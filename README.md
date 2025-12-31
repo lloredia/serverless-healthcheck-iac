@@ -1,3 +1,30 @@
+<div id="top">
+
+<!-- HEADER STYLE: CLASSIC -->
+<div align="center">
+
+<img src="serverless-health-check.png" width="30%" style="position: relative; top: 0; right: 0;" alt="Project Logo"/>
+
+# SERVERLESS-HEALTH-CHECK
+
+<em>Ensure System Uptime, Instantly and Reliably</em>
+
+<!-- BADGES -->
+<img src="https://img.shields.io/github/last-commit/lloredia/serverless-health-check?style=flat&logo=git&logoColor=white&color=0080ff" alt="last-commit">
+<img src="https://img.shields.io/github/languages/top/lloredia/serverless-health-check?style=flat&color=0080ff" alt="repo-top-language">
+<img src="https://img.shields.io/github/languages/count/lloredia/serverless-health-check?style=flat&color=0080ff" alt="repo-language-count">
+
+<em>Built with the tools and technologies:</em>
+
+<img src="https://img.shields.io/badge/Markdown-000000.svg?style=flat&logo=Markdown&logoColor=white" alt="Markdown">
+<img src="https://img.shields.io/badge/Python-3776AB.svg?style=flat&logo=Python&logoColor=white" alt="Python">
+<img src="https://img.shields.io/badge/GitHub%20Actions-2088FF.svg?style=flat&logo=GitHub-Actions&logoColor=white" alt="GitHub%20Actions">
+<img src="https://img.shields.io/badge/Terraform-844FBA.svg?style=flat&logo=Terraform&logoColor=white" alt="Terraform">
+
+</div>
+<br>
+
+---
 
 # Serverless Health Check API
 
