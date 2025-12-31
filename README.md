@@ -534,3 +534,114 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ---
 
 **Built with ❤️ using AWS, Terraform, and GitHub Actions**
+
+
+## 🎯 Assignment Requirements Met
+
+This project fulfills all core requirements:
+
+✅ **Infrastructure as Code**: All AWS resources defined in Terraform
+✅ **Multi-Environment Setup**: Staging and prod environments with `.tfvars`
+✅ **Naming Convention**: All resources follow `env-resource-name` format
+✅ **Required AWS Resources**: DynamoDB, API Gateway, Lambda, IAM with least-privilege
+✅ **Application Logic**: CloudWatch logging, DynamoDB storage, proper API responses
+✅ **CI/CD Pipeline**: Automated deployment via GitHub Actions
+✅ **Clear Documentation**: Comprehensive README with all required information
+
+### Bonus Features Implemented:
+
+✅ **Modular Terraform**: Reusable modules for DynamoDB, Lambda, and API Gateway
+✅ **Automated Lambda Packaging**: Lambda function automatically packaged in pipeline
+✅ **Manual Approval**: Production deployments require manual approval in GitHub
+
+## 🚦 How to Trigger Deployments
+
+### Staging Deployment
+
+**Option 1: Push to staging branch**
+```bash
+git checkout staging
+git push origin staging
+```
+
+**Option 2: Manual workflow dispatch**
+1. Go to Actions tab
+2. Select "Deploy Serverless Health Check"
+3. Click "Run workflow"
+4. Select "staging" environment
+5. Click "Run workflow"
+
+### Production Deployment
+
+**Push to main branch (requires approval)**
+```bash
+git checkout main
+git merge staging
+git push origin main
+```
+
+The workflow will:
+1. Automatically deploy to staging
+2. Wait for manual approval before deploying to prod
+3. Require a reviewer to approve the production deployment
+4. Deploy to production after approval
+
+## 📋 Testing the Deployed Endpoint
+
+After deployment, test the `/health` endpoint:
+
+**Example curl command:**
+```bash
+# Replace with your actual API endpoint from Terraform output
+curl https://abc123def.execute-api.us-east-1.amazonaws.com/health
+
+# POST request with data
+curl -X POST https://abc123def.execute-api.us-east-1.amazonaws.com/health \
+  -H "Content-Type: application/json" \
+  -d '{"test": "data", "source": "curl"}'
+```
+
+**Expected response:**
+```json
+{
+  "status": "healthy",
+  "message": "Request processed and saved.",
+  "request_id": "123e4567-e89b-12d3-a456-426614174000",
+  "timestamp": "2025-01-01T12:00:00.000Z"
+}
+```
+
+## 💭 Design Choices & Assumptions
+
+### Architecture Decisions
+
+1. **HTTP API vs REST API**: Chose HTTP API (API Gateway v2) for lower cost and simpler configuration
+2. **DynamoDB On-Demand**: Selected PAY_PER_REQUEST billing for unpredictable traffic patterns
+3. **Python 3.11**: Latest stable runtime with excellent AWS SDK support
+4. **Modular Terraform**: Organized code into reusable modules for maintainability
+
+### Assumptions
+
+- Single AWS region deployment (us-east-1)
+- Public API endpoint (no authentication for demo purposes)
+- 7-day CloudWatch log retention sufficient for debugging
+- Staging and production are in the same AWS account
+- GitHub repository secrets used for AWS credentials (not OIDC)
+
+### Security Considerations
+
+- IAM roles follow least-privilege principle
+- No hardcoded credentials in code
+- Secrets managed via GitHub Secrets
+- HTTPS-only API endpoints
+- CloudWatch logging for audit trail
+
+### Future Production Considerations
+
+For a production system, consider adding:
+- API authentication (API keys or Cognito)
+- WAF rules for DDoS protection
+- Custom domain with SSL certificate
+- Multi-region deployment
+- Enhanced monitoring and alerting
+- Request rate limiting
