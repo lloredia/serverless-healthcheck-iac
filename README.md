@@ -26,7 +26,7 @@
 
 # Serverless Health Check API
 
-A production-ready serverless health check API built with AWS Lambda, API Gateway, and DynamoDB. Features a complete CI/CD pipeline using Terraform and GitHub Actions for multi-environment deployments.
+A staging & production-ready serverless health check API built with AWS Lambda, API Gateway, and DynamoDB. Features a complete CI/CD pipeline using Terraform and GitHub Actions for multi-environment deployments.
 
 ## 🏗️ Architecture
 
